@@ -20,7 +20,14 @@ Lists running and recently run commands.
 `,
 	},
 	Run: func(req cmds.Request, res cmds.Response) {
-		res.SetOutput(req.InvocContext().ReqLog.Report())
+		ctx := req.InvocContext()
+		log.Debug("active reqs: ctx=", ctx)
+		reqLog := ctx.ReqLog
+		log.Debug("active reqs: reqlog=", reqLog)
+		report := reqLog.Report()
+		log.Debug("active reqs: report=", report)
+		res.SetOutput(report)
+		log.Debug("active reqs: run done")
 	},
 	Options: []cmdsutil.Option{
 		cmdsutil.BoolOption("verbose", "v", "Print extra information.").Default(false),
@@ -31,9 +38,14 @@ Lists running and recently run commands.
 	},
 	Marshalers: map[cmds.EncodingType]cmds.Marshaler{
 		cmds.Text: func(res cmds.Response) (io.Reader, error) {
-			out, ok := res.Output().(*[]*cmds.ReqLogEntry)
+			v := unwrapOutput(res.Output())
+			if v == nil {
+				log.Error("wrapped: %#v", res.Output())
+				return nil, cmds.ErrIncorrectType
+			}
+			out, ok := v.(*[]*cmds.ReqLogEntry)
 			if !ok {
-				log.Errorf("%#v", res.Output())
+				log.Errorf("unwrapped: %#v", v)
 				return nil, cmds.ErrIncorrectType
 			}
 			buf := new(bytes.Buffer)
