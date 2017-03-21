@@ -85,28 +85,6 @@ To use, the daemon must be run with '--enable-pubsub-experiment'.
 			return
 		}
 
-		out := make(chan interface{})
-		res.SetOutput((<-chan interface{})(out))
-
-		go func() {
-			defer sub.Cancel()
-			defer close(out)
-
-			out <- floodsub.Message{}
-
-			for {
-				msg, err := sub.Next(req.Context())
-				if err == io.EOF || err == context.Canceled {
-					return
-				} else if err != nil {
-					res.SetError(err, cmdsutil.ErrNormal)
-					return
-				}
-
-				out <- msg
-			}
-		}()
-
 		discover, _, _ := req.Option("discover").Bool()
 		if discover {
 			go func() {
@@ -120,10 +98,37 @@ To use, the daemon must be run with '--enable-pubsub-experiment'.
 				connectToPubSubPeers(req.Context(), n, cid)
 			}()
 		}
+
+		out := make(chan interface{})
+		res.SetOutput((<-chan interface{})(out))
+
+		go func() {
+			defer sub.Cancel()
+			defer close(out)
+
+			log.Debug("run: loop start")
+			for {
+				msg, err := sub.Next(req.Context())
+				log.Debugf("run.for: received %v - %v", msg, err)
+				if err == io.EOF || err == context.Canceled {
+					return
+				} else if err != nil {
+					res.SetError(err, cmdsutil.ErrNormal)
+					return
+				}
+
+				log.Debugf("run.for: sending msg")
+				out <- msg
+				log.Debugf("run.for: sent")
+			}
+			log.Debug("run: loop end")
+		}()
 	},
 	Marshalers: cmds.MarshalerMap{
 		cmds.Text: getPsMsgMarshaler(func(m *floodsub.Message) (io.Reader, error) {
-			return bytes.NewReader(m.Data), nil
+			r := bytes.NewReader(m.Data)
+			log.Debug(r)
+			return r, nil
 		}),
 		"ndpayload": getPsMsgMarshaler(func(m *floodsub.Message) (io.Reader, error) {
 			m.Data = append(m.Data, '\n')
@@ -165,28 +170,16 @@ func connectToPubSubPeers(ctx context.Context, n *core.IpfsNode, cid *cid.Cid) {
 
 func getPsMsgMarshaler(f func(m *floodsub.Message) (io.Reader, error)) func(cmds.Response) (io.Reader, error) {
 	return func(res cmds.Response) (io.Reader, error) {
-		outChan, ok := res.Output().(<-chan interface{})
+		v := unwrapOutput(res.Output())
+		obj, ok := v.(*floodsub.Message)
 		if !ok {
 			return nil, u.ErrCast()
 		}
-
-		marshal := func(v interface{}) (io.Reader, error) {
-			obj, ok := v.(*floodsub.Message)
-			if !ok {
-				return nil, u.ErrCast()
-			}
-			if obj.Message == nil {
-				return strings.NewReader(""), nil
-			}
-
-			return f(obj)
+		if obj.Message == nil {
+			return strings.NewReader(""), nil
 		}
 
-		return &cmds.ChannelMarshaler{
-			Channel:   outChan,
-			Marshaler: marshal,
-			Res:       res,
-		}, nil
+		return f(obj)
 	}
 }
 
