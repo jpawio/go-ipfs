@@ -199,5 +199,6 @@ type MessageOutput struct {
 }
 
 func MessageTextMarshaler(res oldcmds.Response) (io.Reader, error) {
-	return strings.NewReader(res.Output().(*MessageOutput).Message), nil
+	v := unwrapOutput(res.Output())
+	return strings.NewReader(v.(*MessageOutput).Message), nil
 }

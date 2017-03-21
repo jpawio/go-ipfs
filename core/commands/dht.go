@@ -98,12 +98,7 @@ var queryDhtCmd = &cmds.Command{
 		}()
 	},
 	Marshalers: cmds.MarshalerMap{
-		cmds.Text: func(res cmds.Response) (io.Reader, error) {
-			outChan, ok := res.Output().(<-chan interface{})
-			if !ok {
-				return nil, u.ErrCast()
-			}
-
+		cmds.Text: func() func(cmds.Response) (io.Reader, error) {
 			pfm := pfuncMap{
 				notif.PeerResponse: func(obj *notif.QueryEvent, out io.Writer, verbose bool) {
 					for _, p := range obj.Responses {
@@ -112,7 +107,8 @@ var queryDhtCmd = &cmds.Command{
 				},
 			}
 
-			marshal := func(v interface{}) (io.Reader, error) {
+			return func(res cmds.Response) (io.Reader, error) {
+				v := unwrapOutput(res.Output())
 				obj, ok := v.(*notif.QueryEvent)
 				if !ok {
 					return nil, u.ErrCast()
@@ -124,13 +120,7 @@ var queryDhtCmd = &cmds.Command{
 				printEvent(obj, buf, verbose, pfm)
 				return buf, nil
 			}
-
-			return &cmds.ChannelMarshaler{
-				Channel:   outChan,
-				Marshaler: marshal,
-				Res:       res,
-			}, nil
-		},
+		}(),
 	},
 	Type: notif.QueryEvent{},
 }
@@ -194,13 +184,7 @@ var findProvidersDhtCmd = &cmds.Command{
 		}()
 	},
 	Marshalers: cmds.MarshalerMap{
-		cmds.Text: func(res cmds.Response) (io.Reader, error) {
-			outChan, ok := res.Output().(<-chan interface{})
-			if !ok {
-				return nil, u.ErrCast()
-			}
-
-			verbose, _, _ := res.Request().Option("v").Bool()
+		cmds.Text: func() func(cmds.Response) (io.Reader, error) {
 			pfm := pfuncMap{
 				notif.FinalPeer: func(obj *notif.QueryEvent, out io.Writer, verbose bool) {
 					if verbose {
@@ -221,7 +205,10 @@ var findProvidersDhtCmd = &cmds.Command{
 				},
 			}
 
-			marshal := func(v interface{}) (io.Reader, error) {
+			return func(res cmds.Response) (io.Reader, error) {
+				verbose, _, _ := res.Request().Option("v").Bool()
+				v := unwrapOutput(res.Output())
+
 				obj, ok := v.(*notif.QueryEvent)
 				if !ok {
 					return nil, u.ErrCast()
@@ -231,13 +218,7 @@ var findProvidersDhtCmd = &cmds.Command{
 				printEvent(obj, buf, verbose, pfm)
 				return buf, nil
 			}
-
-			return &cmds.ChannelMarshaler{
-				Channel:   outChan,
-				Marshaler: marshal,
-				Res:       res,
-			}, nil
-		},
+		}(),
 	},
 	Type: notif.QueryEvent{},
 }
@@ -320,13 +301,7 @@ var provideRefDhtCmd = &cmds.Command{
 		}()
 	},
 	Marshalers: cmds.MarshalerMap{
-		cmds.Text: func(res cmds.Response) (io.Reader, error) {
-			outChan, ok := res.Output().(<-chan interface{})
-			if !ok {
-				return nil, u.ErrCast()
-			}
-
-			verbose, _, _ := res.Request().Option("v").Bool()
+		cmds.Text: func() func(res cmds.Response) (io.Reader, error) {
 			pfm := pfuncMap{
 				notif.FinalPeer: func(obj *notif.QueryEvent, out io.Writer, verbose bool) {
 					if verbose {
@@ -335,7 +310,9 @@ var provideRefDhtCmd = &cmds.Command{
 				},
 			}
 
-			marshal := func(v interface{}) (io.Reader, error) {
+			return func(res cmds.Response) (io.Reader, error) {
+				verbose, _, _ := res.Request().Option("v").Bool()
+				v := unwrapOutput(res.Output)
 				obj, ok := v.(*notif.QueryEvent)
 				if !ok {
 					return nil, u.ErrCast()
@@ -345,13 +322,7 @@ var provideRefDhtCmd = &cmds.Command{
 				printEvent(obj, buf, verbose, pfm)
 				return buf, nil
 			}
-
-			return &cmds.ChannelMarshaler{
-				Channel:   outChan,
-				Marshaler: marshal,
-				Res:       res,
-			}, nil
-		},
+		}(),
 	},
 	Type: notif.QueryEvent{},
 }
@@ -454,14 +425,7 @@ var findPeerDhtCmd = &cmds.Command{
 		}()
 	},
 	Marshalers: cmds.MarshalerMap{
-		cmds.Text: func(res cmds.Response) (io.Reader, error) {
-			outChan, ok := res.Output().(<-chan interface{})
-			if !ok {
-				return nil, u.ErrCast()
-			}
-
-			verbose, _, _ := res.Request().Option("v").Bool()
-
+		cmds.Text: func() func(cmds.Response) (io.Reader, error) {
 			pfm := pfuncMap{
 				notif.FinalPeer: func(obj *notif.QueryEvent, out io.Writer, verbose bool) {
 					pi := obj.Responses[0]
@@ -470,23 +434,23 @@ var findPeerDhtCmd = &cmds.Command{
 					}
 				},
 			}
-			marshal := func(v interface{}) (io.Reader, error) {
+
+			return func(res cmds.Response) (io.Reader, error) {
+				verbose, _, _ := res.Request().Option("v").Bool()
+				v := unwrapOutput(res.Output())
+
 				obj, ok := v.(*notif.QueryEvent)
 				if !ok {
+					log.Errorf("expected type %T, got %T", obj, v)
 					return nil, u.ErrCast()
 				}
 
 				buf := new(bytes.Buffer)
 				printEvent(obj, buf, verbose, pfm)
+
 				return buf, nil
 			}
-
-			return &cmds.ChannelMarshaler{
-				Channel:   outChan,
-				Marshaler: marshal,
-				Res:       res,
-			}, nil
-		},
+		}(),
 	},
 	Type: notif.QueryEvent{},
 }
@@ -560,14 +524,7 @@ Different key types can specify other 'best' rules.
 		}()
 	},
 	Marshalers: cmds.MarshalerMap{
-		cmds.Text: func(res cmds.Response) (io.Reader, error) {
-			outChan, ok := res.Output().(<-chan interface{})
-			if !ok {
-				return nil, u.ErrCast()
-			}
-
-			verbose, _, _ := res.Request().Option("v").Bool()
-
+		cmds.Text: func() func(cmds.Response) (io.Reader, error) {
 			pfm := pfuncMap{
 				notif.Value: func(obj *notif.QueryEvent, out io.Writer, verbose bool) {
 					if verbose {
@@ -577,7 +534,11 @@ Different key types can specify other 'best' rules.
 					}
 				},
 			}
-			marshal := func(v interface{}) (io.Reader, error) {
+
+			return func(res cmds.Response) (io.Reader, error) {
+				verbose, _, _ := res.Request().Option("v").Bool()
+				v := unwrapOutput(res.Output())
+
 				obj, ok := v.(*notif.QueryEvent)
 				if !ok {
 					return nil, u.ErrCast()
@@ -589,13 +550,7 @@ Different key types can specify other 'best' rules.
 
 				return buf, nil
 			}
-
-			return &cmds.ChannelMarshaler{
-				Channel:   outChan,
-				Marshaler: marshal,
-				Res:       res,
-			}, nil
-		},
+		}(),
 	},
 	Type: notif.QueryEvent{},
 }
@@ -675,13 +630,7 @@ NOTE: A value may not exceed 2048 bytes.
 		}()
 	},
 	Marshalers: cmds.MarshalerMap{
-		cmds.Text: func(res cmds.Response) (io.Reader, error) {
-			outChan, ok := res.Output().(<-chan interface{})
-			if !ok {
-				return nil, u.ErrCast()
-			}
-
-			verbose, _, _ := res.Request().Option("v").Bool()
+		cmds.Text: func() func(cmds.Response) (io.Reader, error) {
 			pfm := pfuncMap{
 				notif.FinalPeer: func(obj *notif.QueryEvent, out io.Writer, verbose bool) {
 					if verbose {
@@ -693,7 +642,9 @@ NOTE: A value may not exceed 2048 bytes.
 				},
 			}
 
-			marshal := func(v interface{}) (io.Reader, error) {
+			return func(res cmds.Response) (io.Reader, error) {
+				verbose, _, _ := res.Request().Option("v").Bool()
+				v := unwrapOutput(res.Output())
 				obj, ok := v.(*notif.QueryEvent)
 				if !ok {
 					return nil, u.ErrCast()
@@ -704,13 +655,7 @@ NOTE: A value may not exceed 2048 bytes.
 
 				return buf, nil
 			}
-
-			return &cmds.ChannelMarshaler{
-				Channel:   outChan,
-				Marshaler: marshal,
-				Res:       res,
-			}, nil
-		},
+		}(),
 	},
 	Type: notif.QueryEvent{},
 }

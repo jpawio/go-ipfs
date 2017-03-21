@@ -128,7 +128,8 @@ var KeyGenCmd = &cmds.Command{
 	},
 	Marshalers: cmds.MarshalerMap{
 		cmds.Text: func(res cmds.Response) (io.Reader, error) {
-			k, ok := res.Output().(*KeyOutput)
+			v := unwrapOutput(res.Output())
+			k, ok := v.(*KeyOutput)
 			if !ok {
 				return nil, fmt.Errorf("expected a KeyOutput as command result")
 			}
@@ -192,7 +193,8 @@ var KeyListCmd = &cmds.Command{
 func keyOutputListMarshaler(res cmds.Response) (io.Reader, error) {
 	withId, _, _ := res.Request().Option("l").Bool()
 
-	list, ok := res.Output().(*KeyOutputList)
+	v := unwrapOutput(res.Output())
+	list, ok := v.(*KeyOutputList)
 	if !ok {
 		return nil, errors.New("failed to cast []KeyOutput")
 	}

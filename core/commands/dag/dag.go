@@ -144,3 +144,19 @@ func convertJsonToType(r io.Reader, format string) (node.Node, error) {
 		return nil, fmt.Errorf("unknown target format: %s", format)
 	}
 }
+
+// copy+pasted from ../commands.go
+func unwrapOutput(i interface{}) interface{} {
+	var (
+		ch <-chan interface{}
+		ok bool
+	)
+
+	if ch, ok = i.(<-chan interface{}); !ok {
+		if ch, ok = i.(chan interface{}); !ok {
+			return nil
+		}
+	}
+
+	return <-ch
+}

@@ -122,11 +122,9 @@ var swarmPeersCmd = &cmds.Command{
 	},
 	Marshalers: cmds.MarshalerMap{
 		cmds.Text: func(res cmds.Response) (io.Reader, error) {
-			ch, ok := res.Output().(chan interface{})
-			if !ok {
-				return nil, fmt.Errorf("expected output type to be chan interface{}")
-			}
-			ci, ok := (<-ch).(*connInfos)
+			v := unwrapOutput(res.Output())
+
+			ci, ok := v.(*connInfos)
 			if !ok {
 				return nil, fmt.Errorf("expected output type to be connInfos")
 			}
@@ -232,12 +230,9 @@ var swarmAddrsCmd = &cmds.Command{
 	},
 	Marshalers: cmds.MarshalerMap{
 		cmds.Text: func(res cmds.Response) (io.Reader, error) {
-			ch, ok := res.Output().(chan interface{})
-			if !ok {
-				return nil, errors.New("failed to cast chan interface{}")
-			}
+			v := unwrapOutput(res.Output())
 
-			m, ok := (<-ch).(*addrMap)
+			m, ok := v.(*addrMap)
 			if !ok {
 				return nil, errors.New("failed to cast map[string]string")
 			}
@@ -274,9 +269,10 @@ var swarmAddrsLocalCmd = &cmds.Command{
 		cmdsutil.BoolOption("id", "Show peer ID in addresses.").Default(false),
 	},
 	Run: func(req cmds.Request, res cmds.Response) {
-		log.Debug("swarm addrs local: Run()")
-
-		n, err := req.InvocContext().GetNode()
+		log.Debug("swarm addrs local: Run() - req=", req)
+		iCtx := req.InvocContext()
+		log.Debug("swarm addrs local Run: iCtx=", iCtx)
+		n, err := iCtx.GetNode()
 		if err != nil {
 			res.SetError(err, cmdsutil.ErrNormal)
 			return
@@ -450,13 +446,9 @@ it will reconnect.
 func stringListMarshaler(res cmds.Response) (io.Reader, error) {
 	log.Debug("stringListMarshaler()")
 
-	ch, ok := res.Output().(chan interface{})
-	if !ok {
-		log.Debug("stringListMarshaler: chan cast failed")
-		return nil, errors.New("failed to cast chan interface{}")
-	}
+	v := unwrapOutput(res.Output())
 
-	list, ok := (<-ch).(*stringList)
+	list, ok := v.(*stringList)
 	if !ok {
 		log.Debug("stringListMarshaler: stringlist cast failed")
 		return nil, errors.New("failed to cast []string")

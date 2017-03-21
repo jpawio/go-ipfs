@@ -171,6 +171,9 @@ func cmdPathStrings(cmd *Command, showOptions bool) []string {
 	return cmds
 }
 
+// changes here will also need to be applied at
+// - ./dag/dag.go
+// - ./object/object.go
 func unwrapOutput(i interface{}) interface{} {
 	var (
 		ch <-chan interface{}
@@ -179,7 +182,7 @@ func unwrapOutput(i interface{}) interface{} {
 
 	if ch, ok = i.(<-chan interface{}); !ok {
 		if ch, ok = i.(chan interface{}); !ok {
-			return nil
+			return i
 		}
 	}
 

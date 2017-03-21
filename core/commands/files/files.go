@@ -114,8 +114,8 @@ Type: <type>`),
 	},
 	Marshalers: cmds.MarshalerMap{
 		cmds.Text: func(res cmds.Response) (io.Reader, error) {
-
-			out := res.Output().(*Object)
+			v := unwrapOutput(res.Output())
+			out := v.(*Object)
 			buf := new(bytes.Buffer)
 
 			s, _ := statGetFormatOptions(res.Request())
@@ -384,7 +384,8 @@ Examples:
 	},
 	Marshalers: cmds.MarshalerMap{
 		cmds.Text: func(res cmds.Response) (io.Reader, error) {
-			out := res.Output().(*FilesLsOutput)
+			v := unwrapOutput(res.Output())
+			out := v.(*FilesLsOutput)
 			buf := new(bytes.Buffer)
 			long, _, _ := res.Request().Option("l").Bool()
 
@@ -928,4 +929,20 @@ func checkPath(p string) (string, error) {
 		cleaned += "/"
 	}
 	return cleaned, nil
+}
+
+// copy+pasted from ../commands.go
+func unwrapOutput(i interface{}) interface{} {
+	var (
+		ch <-chan interface{}
+		ok bool
+	)
+
+	if ch, ok = i.(<-chan interface{}); !ok {
+		if ch, ok = i.(chan interface{}); !ok {
+			return nil
+		}
+	}
+
+	return <-ch
 }

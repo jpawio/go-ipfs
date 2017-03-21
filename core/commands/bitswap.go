@@ -152,7 +152,8 @@ var bitswapStatCmd = &cmds.Command{
 	},
 	Marshalers: cmds.MarshalerMap{
 		cmds.Text: func(res cmds.Response) (io.Reader, error) {
-			out, ok := res.Output().(*bitswap.Stat)
+			v := unwrapOutput(res.Output())
+			out, ok := v.(*bitswap.Stat)
 			if !ok {
 				return nil, u.ErrCast()
 			}
@@ -215,7 +216,8 @@ prints the ledger associated with a given peer.
 	},
 	Marshalers: cmds.MarshalerMap{
 		cmds.Text: func(res cmds.Response) (io.Reader, error) {
-			out, ok := res.Output().(*decision.Receipt)
+			v := unwrapOutput(res.Output())
+			out, ok := v.(*decision.Receipt)
 			if !ok {
 				return nil, u.ErrCast()
 			}

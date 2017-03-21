@@ -66,7 +66,8 @@ represent it.
 	Type: coreunix.AddedObject{},
 	Marshalers: cmds.MarshalerMap{
 		cmds.Text: func(res cmds.Response) (io.Reader, error) {
-			o := res.Output().(*coreunix.AddedObject)
+			v := unwrapOutput(res.Output())
+			o := v.(*coreunix.AddedObject)
 			return strings.NewReader(o.Hash + "\n"), nil
 		},
 	},

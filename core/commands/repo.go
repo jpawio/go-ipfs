@@ -55,12 +55,14 @@ order to reclaim hard disk space.
 	Run: func(req cmds.Request, res cmds.Response) {
 		n, err := req.InvocContext().GetNode()
 		if err != nil {
+			log.Debug("Run.if: getNode failed with ", err)
 			res.SetError(err, cmdsutil.ErrNormal)
 			return
 		}
 
 		gcOutChan, err := corerepo.GarbageCollectAsync(n, req.Context())
 		if err != nil {
+			log.Debug("Run.if: gcAsync failed with ", err)
 			res.SetError(err, cmdsutil.ErrNormal)
 			return
 		}
@@ -71,7 +73,7 @@ order to reclaim hard disk space.
 		go func() {
 			defer func() {
 				close(outChan)
-				log.Debug("Run.go: closing outChan")
+				log.Debug("Run.go.defer: closing outChan")
 			}()
 
 			for k := range gcOutChan {
@@ -140,7 +142,8 @@ Version         string The repo version.
 	Type: corerepo.Stat{},
 	Marshalers: cmds.MarshalerMap{
 		cmds.Text: func(res cmds.Response) (io.Reader, error) {
-			stat, ok := res.Output().(*corerepo.Stat)
+			v := unwrapOutput(res.Output())
+			stat, ok := v.(*corerepo.Stat)
 			if !ok {
 				return nil, u.ErrCast()
 			}
@@ -249,6 +252,7 @@ var repoVerifyCmd = &cmds.Command{
 			var i int
 			for k := range keys {
 				_, err := bs.Get(k)
+				log.Debugf("Run.go.for: bs.Get(%s) returned err=%s", k, err)
 				if err != nil {
 					out <- &VerifyProgress{
 						Message: fmt.Sprintf("block %s was corrupt (%s)", k, err),
@@ -259,9 +263,12 @@ var repoVerifyCmd = &cmds.Command{
 				out <- &VerifyProgress{Progress: i}
 			}
 			if fails == 0 {
+				log.Debug("Run.go.else: all ok")
 				out <- &VerifyProgress{Message: "verify complete, all blocks validated."}
 			} else {
-				out <- &VerifyProgress{Message: "verify complete, some blocks were corrupt."}
+				//out <- &VerifyProgress{Message: "verify complete, some blocks were corrupt."}
+				log.Debugf("Run.go.else: %T.SetError", res)
+				res.SetError(fmt.Errorf("verify complete, some blocks were corrupt"), cmdsutil.ErrNormal)
 			}
 		}()
 
@@ -270,35 +277,27 @@ var repoVerifyCmd = &cmds.Command{
 	Type: VerifyProgress{},
 	Marshalers: cmds.MarshalerMap{
 		cmds.Text: func(res cmds.Response) (io.Reader, error) {
-			out := res.Output().(<-chan interface{})
+			v := unwrapOutput(res.Output())
 
-			marshal := func(v interface{}) (io.Reader, error) {
-				obj, ok := v.(*VerifyProgress)
-				if !ok {
-					return nil, u.ErrCast()
+			obj, ok := v.(*VerifyProgress)
+			if !ok {
+				return nil, u.ErrCast()
+			}
+
+			buf := new(bytes.Buffer)
+			if obj.Message != "" {
+				if strings.Contains(obj.Message, "blocks were corrupt") {
+					return nil, fmt.Errorf(obj.Message)
 				}
-
-				buf := new(bytes.Buffer)
-				if obj.Message != "" {
-					if strings.Contains(obj.Message, "blocks were corrupt") {
-						return nil, fmt.Errorf(obj.Message)
-					}
-					if len(obj.Message) < 20 {
-						obj.Message += "             "
-					}
-					fmt.Fprintln(buf, obj.Message)
-					return buf, nil
+				if len(obj.Message) < 20 {
+					obj.Message += "             "
 				}
-
-				fmt.Fprintf(buf, "%d blocks processed.\r", obj.Progress)
+				fmt.Fprintln(buf, obj.Message)
 				return buf, nil
 			}
 
-			return &cmds.ChannelMarshaler{
-				Channel:   out,
-				Marshaler: marshal,
-				Res:       res,
-			}, nil
+			fmt.Fprintf(buf, "%d blocks processed.\r", obj.Progress)
+			return buf, nil
 		},
 	},
 }
@@ -322,7 +321,8 @@ var repoVersionCmd = &cmds.Command{
 	Type: RepoVersion{},
 	Marshalers: cmds.MarshalerMap{
 		cmds.Text: func(res cmds.Response) (io.Reader, error) {
-			response := res.Output().(*RepoVersion)
+			v := unwrapOutput(res.Output())
+			response := v.(*RepoVersion)
 
 			quiet, _, err := res.Request().Option("quiet").Bool()
 			if err != nil {

@@ -180,8 +180,9 @@ possible, please use 'ipfs ls' instead.
 	},
 	Marshalers: cmds.MarshalerMap{
 		cmds.Text: func(res cmds.Response) (io.Reader, error) {
+			v := unwrapOutput(res.Output())
 
-			output := res.Output().(*LsOutput)
+			output := v.(*LsOutput)
 			buf := new(bytes.Buffer)
 			w := tabwriter.NewWriter(buf, 1, 2, 1, ' ', 0)
 

@@ -123,7 +123,8 @@ Resolve the value of a reference:
 	},
 	Marshalers: cmds.MarshalerMap{
 		cmds.Text: func(res cmds.Response) (io.Reader, error) {
-			output, ok := res.Output().(*ResolvedPath)
+			v := unwrapOutput(res.Output())
+			output, ok := v.(*ResolvedPath)
 			if !ok {
 				return nil, u.ErrCast()
 			}

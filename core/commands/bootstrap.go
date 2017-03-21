@@ -113,13 +113,14 @@ in the bootstrap list).
 	Type: BootstrapOutput{},
 	Marshalers: cmds.MarshalerMap{
 		cmds.Text: func(res cmds.Response) (io.Reader, error) {
-			v, ok := res.Output().(*BootstrapOutput)
+			v := unwrapOutput(res.Output())
+			out, ok := v.(*BootstrapOutput)
 			if !ok {
 				return nil, u.ErrCast()
 			}
 
 			buf := new(bytes.Buffer)
-			if err := bootstrapWritePeers(buf, "added ", v.Peers); err != nil {
+			if err := bootstrapWritePeers(buf, "added ", out.Peers); err != nil {
 				return nil, err
 			}
 
@@ -165,13 +166,14 @@ in the bootstrap list).`,
 	Type: BootstrapOutput{},
 	Marshalers: cmds.MarshalerMap{
 		cmds.Text: func(res cmds.Response) (io.Reader, error) {
-			v, ok := res.Output().(*BootstrapOutput)
+			v := unwrapOutput(res.Output())
+			out, ok := v.(*BootstrapOutput)
 			if !ok {
 				return nil, u.ErrCast()
 			}
 
 			buf := new(bytes.Buffer)
-			if err := bootstrapWritePeers(buf, "added ", v.Peers); err != nil {
+			if err := bootstrapWritePeers(buf, "added ", out.Peers); err != nil {
 				return nil, err
 			}
 
@@ -237,9 +239,15 @@ var bootstrapRemoveCmd = &cmds.Command{
 	Type: BootstrapOutput{},
 	Marshalers: cmds.MarshalerMap{
 		cmds.Text: func(res cmds.Response) (io.Reader, error) {
-			ch, ok := res.Output().(chan interface{})
-			if !ok {
-				return nil, u.ErrCast()
+			var (
+				ch <-chan interface{}
+				ok bool
+			)
+
+			if ch, ok = res.Output().(<-chan interface{}); !ok {
+				if ch, ok = res.Output().(chan interface{}); !ok {
+					return nil, u.ErrCast()
+				}
 			}
 
 			v, ok := (<-ch).(*BootstrapOutput)
@@ -284,13 +292,14 @@ var bootstrapRemoveAllCmd = &cmds.Command{
 	Type: BootstrapOutput{},
 	Marshalers: cmds.MarshalerMap{
 		cmds.Text: func(res cmds.Response) (io.Reader, error) {
-			v, ok := res.Output().(*BootstrapOutput)
+			v := unwrapOutput(res.Output())
+			out, ok := v.(*BootstrapOutput)
 			if !ok {
 				return nil, u.ErrCast()
 			}
 
 			buf := new(bytes.Buffer)
-			err := bootstrapWritePeers(buf, "removed ", v.Peers)
+			err := bootstrapWritePeers(buf, "removed ", out.Peers)
 			return buf, err
 		},
 	},
@@ -330,13 +339,14 @@ var bootstrapListCmd = &cmds.Command{
 }
 
 func bootstrapMarshaler(res cmds.Response) (io.Reader, error) {
-	v, ok := res.Output().(*BootstrapOutput)
+	v := unwrapOutput(res.Output())
+	out, ok := v.(*BootstrapOutput)
 	if !ok {
 		return nil, u.ErrCast()
 	}
 
 	buf := new(bytes.Buffer)
-	err := bootstrapWritePeers(buf, "", v.Peers)
+	err := bootstrapWritePeers(buf, "", out.Peers)
 	return buf, err
 }
 

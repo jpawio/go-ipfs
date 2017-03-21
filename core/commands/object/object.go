@@ -156,7 +156,9 @@ multihash.
 	},
 	Marshalers: cmds.MarshalerMap{
 		cmds.Text: func(res cmds.Response) (io.Reader, error) {
-			object := res.Output().(*Object)
+			v := unwrapOutput(res.Output())
+			object := v.(*Object)
+
 			buf := new(bytes.Buffer)
 			w := tabwriter.NewWriter(buf, 1, 2, 1, ' ', 0)
 			headers, _, _ := res.Request().Option("headers").Bool()
@@ -640,4 +642,20 @@ func deserializeNode(nd *Node, dataFieldEncoding string) (*dag.ProtoNode, error)
 
 func NodeEmpty(node *Node) bool {
 	return (node.Data == "" && len(node.Links) == 0)
+}
+
+// copy+pasted from ../commands.go
+func unwrapOutput(i interface{}) interface{} {
+	var (
+		ch <-chan interface{}
+		ok bool
+	)
+
+	if ch, ok = i.(<-chan interface{}); !ok {
+		if ch, ok = i.(chan interface{}); !ok {
+			return nil
+		}
+	}
+
+	return <-ch
 }
